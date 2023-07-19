@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Binance Futures Scalp V0.1</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    #chart {
+      position: fixed;
+      top: 40px;
+      left: 0;
+      width: 100%;
+      height: calc(100% - 80px);
+      background-color: black;
+      border: 1px solid black;
+      display: block;
+    }
+
+    .button {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 40px;
+      background-color: black;
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      padding: 0 5px;
+    }
+
+    .button button {
+      margin-right: 10px;
+      background-color: black;
+      border: none;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 8px 8px;
+      height: 40px;
+    }
+
+    .button button:first-child {
+      margin-left: 0;
+    }
+
+    .button-container-bottom {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 40px;
+      background-color: black;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0 10px;
+    }
+
+    .button-container-bottom button {
+      margin-right: 10px;
+      background-color: black;
+      border: none;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 8px 16px;
+    }
+
+    .button-container-bottom button:first-child {
+      background-color: green;
+    }
+
+    .button-container-bottom button:last-child {
+      background-color: red;
+    }
+
+    #settingsWindow {
+      display: none;
+      background-color: black;
+      color: white;
+      position: fixed;
+      top: 40px;
+      left: 0;
+      width: 100%;
+      height: calc(100% - 80px);
+      padding: 20px;
+    }
+
+    #settingsButton {
+      position: fixed;
+      top: 0;
+      right: 0px;
+      background-color: black;
+      border: none;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      padding: 8px 8px;
+      z-index: 1;
+      text-align: right;
+    }
+
+    .input-row {
+      display: flex;
+      margin-bottom: 10px;
+    }
+
+    .label-column {
+      flex-basis: 40%;
+    }
+
+    .input-column {
+      flex-basis: 60%;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="chart"></canvas>
+  <div class="button">
+    <!-- Buttons for selecting time intervals -->
+    <button onclick="changeInterval('1m')" style="font-family: Arial, sans-serif; font-size: 13px;">1m</button>
+    <button onclick="changeInterval('3m')" style="font-family: Arial, sans-serif; font-size: 13px;">3m</button>
+    <button onclick="changeInterval('15m')" style="font-family: Arial, sans-serif; font-size: 13px;">15m</button>
+    <button onclick="changeInterval('30m')" style="font-family: Arial, sans-serif; font-size: 13px;">30m</button>
+    <button onclick="changeInterval('1h')" style="font-family: Arial, sans-serif; font-size: 13px;">1h</button>
+    <button onclick="changeInterval('4h')" style="font-family: Arial, sans-serif; font-size: 13px;">4h</button>
+    <button onclick="changeInterval('1d')" style="font-family: Arial, sans-serif; font-size: 13px;">1d</button>
+    <button id="settingsButton" style="font-family: Arial, sans-serif; font-size: 13px;">Settings</button>
+  </div>
+
+  <div class="button-container-bottom">
+    <!-- Button to open the trade -->
+    <button id="openTradeButton">open Trade</button>
+  </div>
+
+
+  <div id="settingsWindow" style="display: none; font-family: Arial, sans-serif; font-size: 13px;">
+    <!-- Settings window with input fields and buttons -->
+    <div class="input-row">
+      <div class="label-column">
+        <label for="inputOrderCostOpeningPosition">Order Cost Opening Position:</label>
+      </div>
+      <div class="input-column">
+        <input type="text" id="inputOrderCostOpeningPosition" />
+      </div>
+    </div>
+    <div class="input-row">
+      <div class="label-column">
+        <label for="inputOrderCostClosingPosition">Order Cost Closing Position:</label>
+      </div>
+      <div class="input-column">
+        <input type="text" id="inputOrderCostClosingPosition" />
+      </div>
+    </div>
+    <div class="input-row">
+      <div class="label-column">
+        <label for="inputRisk">Risk:</label>
+      </div>
+      <div class="input-column">
+        <input type="text" id="inputRisk" />
+      </div>
+    </div>
+    <div class="input-row">
+      <div class="label-column">
+        <label for="inputRiskReward">Risk-Reward:</label>
+      </div>
+      <div class="input-column">
+        <input type="text" id="inputRiskReward" />
+      </div>
+    </div>
+    <div class="input-row">
+      <div class="label-column">
+        <label for="inputApiKey">API Key:</label>
+      </div>
+      <div class="input-column">
+        <input type="text" id="inputApiKey" />
+      </div>
+    </div>
+    <div class="input-row">
+      <div class="label-column">
+        <label for="inputApiSecret">API Secret:</label>
+      </div>
+      <div class="input-column">
+        <input type="text" id="inputApiSecret" />
+      </div>
+    </div>
+
+    <br /><br />
+    <button id="saveButton">Save</button>
+    <button id="closeButton">Close</button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+  <script>
+
+    /* Copyright 2023 Dragan Bojovic
+    * Licensed under the GPLv3 License
+    * https://www.gnu.org/licenses/gpl-3.0.html
+    */
+
+
+    const symbol = "BTCUSDT";
+
+
+
+    async function getBTCUSDTPrice() {
+      const endpoint = "/fapi/v1/ticker/price";
+      const url = `https://fapi.binance.com${endpoint}?symbol=${symbol}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+      return parseFloat(data.price);
+    }
+
+    async function placeTrade(positionSize, stopLossPrice, takeProfitPrice, direction) {
+      try {
+        const price = await getBTCUSDTPrice();
+        const btcAmount = (positionSize / price).toFixed(3);
+        const side = direction.toUpperCase() === "LONG" ? "BUY" : "SELL";
+        const positionSide = direction.toUpperCase() === "LONG" ? "LONG" : "SHORT";
+
+        const orderParams = {
+          symbol: symbol,
+          side: side,
+          positionSide: positionSide,
+          type: "MARKET",
+          quantity: btcAmount,
+          timestamp: Date.now()
+        };
+
+        const queryString = Object.entries(orderParams)
+          .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+          .join("&");
+
+        const signature = CryptoJS.HmacSHA256(queryString, api_secret).toString(CryptoJS.enc.Hex);
+
+        const orderUrl = `https://fapi.binance.com/fapi/v1/order?${queryString}&signature=${signature}`;
+
+        const orderResponse = await fetch(orderUrl, {
+          method: "POST",
+          headers: {
+            "X-MBX-APIKEY": api_key
+          }
+        });
+
+        const orderData = await orderResponse.json();
+        console.log(orderData);
+        console.log("Market Order Price:", price);
+
+        await setStopLoss(stopLossPrice, btcAmount, positionSide);
+        await setTakeProfit(takeProfitPrice, btcAmount, positionSide);
+      } catch (error) {
+        console.error("Error:", error);
+      }
+    }
+
+    async function setStopLoss(stopLossPrice, btcAmount, positionSide) {
+      const side = direction === "long" ? "SELL" : "BUY";
+      const stopLossParams = {
+        symbol: symbol,
+        side: side,
+        positionSide: positionSide,
+        type: "STOP_MARKET",
+        quantity: btcAmount,
+        stopPrice: stopLossPrice,
+        timestamp: Date.now()
+      };
+
+      const queryString = Object.entries(stopLossParams)
+        .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+        .join("&");
+
+      const signature = CryptoJS.HmacSHA256(queryString, api_secret).toString(CryptoJS.enc.Hex);
+
+      const stopLossUrl = `https://fapi.binance.com/fapi/v1/order?${queryString}&signature=${signature}`;
+
+      const stopLossResponse = await fetch(stopLossUrl, {
+        method: "POST",
+        headers: {
+          "X-MBX-APIKEY": api_key
+        }
+      });
+
+      const stopLossData = await stopLossResponse.json();
+      console.log(stopLossData);
+      console.log("Stop Loss Price:", stopLossPrice);
+    }
+
+    async function setTakeProfit(takeProfitPrice, btcAmount, positionSide) {
+      const side = direction === "long" ? "SELL" : "BUY";
+      const takeProfitParams = {
+        symbol: symbol,
+        side: side,
+        positionSide: positionSide,
+        type: "TAKE_PROFIT_MARKET",
+        quantity: btcAmount,
+        stopPrice: takeProfitPrice,
+        timestamp: Date.now()
+      };
+
+      const queryString = Object.entries(takeProfitParams)
+        .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+        .join("&");
+
+      const signature = CryptoJS.HmacSHA256(queryString, api_secret).toString(CryptoJS.enc.Hex);
+
+      const takeProfitUrl = `https://fapi.binance.com/fapi/v1/order?${queryString}&signature=${signature}`;
+
+      const takeProfitResponse = await fetch(takeProfitUrl, {
+        method: "POST",
+        headers: {
+          "X-MBX-APIKEY": api_key
+        }
+      });
+
+      const takeProfitData = await takeProfitResponse.json();
+      console.log(takeProfitData);
+      console.log("Take Profit Price:", takeProfitPrice);
+    }
+
+
+
+
+    // Globale Variablen und Konstanten
+    //const maxPositionSize = 99; // Maximale Positionsgröße als Vielfaches des Eigenkapitals
+    let api_key = 'api key';
+    let api_secret = 'secret key';
+    let stopLossPrice
+    let takeProfitPrice;
+    let positionSize;
+    let direction
+    let risk = 1;
+    let orderCostOpeningPosition = 0.04;
+    let orderCostClosingPosition = 0.04;
+    let riskReward = 1;
+
+    let availableCapital = 1000;
+
+    let cachedData = null;
+    let offsetX = 0, offsetY = 0, scaleXFactor = 1, scaleYFactor = 1;
+    let isMouseDown = false, isPanning = false, startX, startY;
+    let currentInterval = '3m';
+    let candleWidth = 3; // Startbreite der Kerzen
+    const minCandleWidth = 1; // Minimale Breite einer Kerze
+    const maxCandleWidth = 50; // Maximale Breite einer Kerze
+    const candleSpacing = 2; // Abstand zwischen den Kerzen
+    const wickWidthFactor = 0.2; // Docht-Breitenfaktor relativ zur Kerzenbreite
+
+    // Add event listener for the settings button
+    settingsButton.addEventListener('click', () => {
+      const chart = document.getElementById('chart');
+      const settingsWindow = document.getElementById('settingsWindow');
+
+      // Load initial values into input fields
+      document.getElementById('inputOrderCostOpeningPosition').value = orderCostOpeningPosition;
+      document.getElementById('inputOrderCostClosingPosition').value = orderCostClosingPosition;
+      document.getElementById('inputRisk').value = risk;
+      document.getElementById('inputRiskReward').value = riskReward;
+      document.getElementById('inputApiKey').value = api_key;
+      document.getElementById('inputApiSecret').value = api_secret;
+
+      chart.style.display = 'none';
+      settingsWindow.style.display = 'block';
+    });
+
+    saveButton.addEventListener('click', () => {
+      // Convert input values to numbers
+      const inputRisk = parseFloat(document.getElementById('inputRisk').value);
+      const inputOrderCostOpeningPosition = parseFloat(document.getElementById('inputOrderCostOpeningPosition').value);
+      const inputOrderCostClosingPosition = parseFloat(document.getElementById('inputOrderCostClosingPosition').value);
+      const inputRiskReward = parseFloat(document.getElementById('inputRiskReward').value);
+      const inputApiKey = document.getElementById('inputApiKey').value;
+      const inputApiSecret = document.getElementById('inputApiSecret').value;
+
+      // Update global variables with new values
+      risk = isNaN(inputRisk) ? risk : inputRisk;
+      orderCostOpeningPosition = isNaN(inputOrderCostOpeningPosition) ? orderCostOpeningPosition : inputOrderCostOpeningPosition;
+      orderCostClosingPosition = isNaN(inputOrderCostClosingPosition) ? orderCostClosingPosition : inputOrderCostClosingPosition;
+      riskReward = isNaN(inputRiskReward) ? riskReward : inputRiskReward;
+      api_key = inputApiKey.trim();
+      api_secret = inputApiSecret.trim();
+
+      // Close the settings window
+      const chart = document.getElementById('chart');
+      const settingsWindow = document.getElementById('settingsWindow');
+
+      chart.style.display = 'block';
+      settingsWindow.style.display = 'none';
+
+      // Redraw chart with updated values
+      drawChart(cachedData);
+      fetchAvailableCapital();
+    });
+
+    closeButton.addEventListener('click', () => {
+
+      // Close the settings window
+      const chart = document.getElementById('chart');
+      const settingsWindow = document.getElementById('settingsWindow');
+
+      chart.style.display = 'block';
+      settingsWindow.style.display = 'none';
+
+      // Restore previous values in input fields
+      document.getElementById('inputRisk').value = risk;
+      document.getElementById('inputOrderCostOpeningPosition').value = orderCostOpeningPosition;
+      document.getElementById('inputOrderCostClosingPosition').value = orderCostClosingPosition;
+      document.getElementById('inputRiskReward').value = riskReward;
+      document.getElementById('inputApiKey').value = api_key;
+      document.getElementById('inputApiSecret').value = api_secret;
+    });
+
+
+    // Funktion zum Abrufen von Candlestick-Daten von der Binance API
+    async function getData(interval) {
+      const res = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&limit=500&interval=${interval}`);
+      const data = await res.json();
+      const ohlcData = data.map(e => ({
+        timestamp: parseInt(e[0]),
+        open: parseFloat(e[1]),
+        high: parseFloat(e[2]),
+        low: parseFloat(e[3]),
+        close: parseFloat(e[4])
+      }));
+      return ohlcData;
+    }
+
+    // Funktion zum Abrufen des aktuellen Preises von der Binance API
+    async function getLatestPrice() {
+      const res = await fetch('https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT');
+      const data = await res.json();
+      return parseFloat(data.price);
+    }
+
+    // Funktion zum Überprüfen, ob eine Kerze aufgrund des angegebenen Intervalls abgelaufen ist
+    function isCandleExpired(timestamp, interval) {
+      const currentTime = new Date().getTime();
+      const elapsed = currentTime - timestamp;
+      return elapsed >= interval;
+    }
+
+    // Funktion zum Skalieren der x-Koordinate basierend auf der Kerzenbreite und dem Abstand
+    function scaleX(i, xStep) {
+      return (i * (xStep + candleSpacing) + offsetX) * scaleXFactor;
+    }
+
+    // Funktion zum Skalieren der y-Koordinate basierend auf den Daten, dem Mindestwert, dem y-Schritt und der Diagrammhöhe
+    function scaleY(value, min, yStep, h) {
+      return (h - (value - min) * yStep + offsetY) * scaleYFactor;
+    }
+
+    // Funktion zum Berechnen des Preises basierend auf der y-Koordinate
+    function getPriceFromY(y, min, yStep, h) {
+      const scaledY = (y / scaleYFactor) - offsetY;
+      return min + ((h - scaledY) / yStep);
+    }
+
+    // Guthaben bei Binance abrufen
+    async function fetchAvailableCapital() {
+      const endpoint = "/fapi/v2/account";
+      const timestamp = Date.now();
+      const queryString = `timestamp=${timestamp}`;
+
+      const signature = CryptoJS.HmacSHA256(queryString, api_secret).toString(CryptoJS.enc.Hex);
+
+      const url = `https://fapi.binance.com${endpoint}?${queryString}&signature=${signature}`;
+
+      const response = await fetch(url, {
+        headers: {
+          "X-MBX-APIKEY": api_key
+        }
+      });
+
+      const data = await response.json();
+
+      const usdtAsset = data.assets.find((asset) => asset.asset === "USDT");
+      if (usdtAsset) {
+        availableCapital = parseFloat(usdtAsset.availableBalance);
+        console.log("Available capital:", availableCapital);
+      } else {
+        console.log("USDT asset not found in the response data.");
+      }
+    }
+
+    // Rufen Sie die Funktion zum Abrufen des verfügbaren Kapitals auf, wenn die Seite geladen ist
+    window.addEventListener("load", fetchAvailableCapital);
+
+    // Function to draw the candlestick chart on the canvas
+    async function drawChart(data) {
+      const canvas = document.getElementById('chart');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const width = canvas.width;
+      const height = canvas.height;
+
+      // Draw candlestick chart
+      const min = Math.min(...data.map(e => e.low));
+      const max = Math.max(...data.map(e => e.high));
+      const yStep = height / (max - min);
+
+      const candleXStart = width - (data.length * (candleWidth + candleSpacing)) - offsetX;
+
+      // Draw each candlestick and wick
+      for (let i = 0; i < data.length; i++) {
+        const candle = data[i];
+        const x = candleXStart + (i * (candleWidth + candleSpacing));
+        const openY = scaleY(candle.open, min, yStep, height);
+        const closeY = scaleY(candle.close, min, yStep, height);
+        const highY = scaleY(candle.high, min, yStep, height);
+        const lowY = scaleY(candle.low, min, yStep, height);
+
+        const wickX = x + candleWidth / 2 - (candleWidth * wickWidthFactor) / 2;
+
+        // Draw the wick
+        ctx.beginPath();
+        ctx.moveTo(x + candleWidth / 2, highY);
+        ctx.lineTo(x + candleWidth / 2, lowY);
+        ctx.strokeStyle = candle.open > candle.close ? '#f23645' : '#089981';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // Draw the candle body
+        ctx.beginPath();
+        ctx.rect(x, Math.min(openY, closeY), candleWidth, Math.abs(openY - closeY));
+        ctx.fillStyle = candle.open > candle.close ? '#f23645' : '#089981';
+        ctx.fill();
+      }
+
+      // Draw white horizontal line in the middle, the stop loss line
+      const midY = height / 2;
+      ctx.beginPath();
+      ctx.moveTo(0, midY);
+      ctx.lineTo(width, midY);
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Calculate the price at the stop loss level
+      stopLossPrice = getPriceFromY(midY, min, yStep, height);
+      stopLossPrice = Math.round(stopLossPrice * 100) / 100;
+
+
+
+      // Calculate the percentage difference
+      const latestPrice = cachedData[cachedData.length - 1].close;
+      const percentageDifference = Math.abs(((latestPrice - stopLossPrice) / stopLossPrice) * 100);
+
+      // Draw the current price line
+      ctx.beginPath();
+      ctx.moveTo(0, scaleY(latestPrice, min, yStep, height));
+      ctx.lineTo(canvas.width, scaleY(latestPrice, min, yStep, height));
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]); // Dashed line style
+      ctx.stroke();
+      ctx.setLineDash([]); // Reset line style
+
+      // Display the "STOP LOSS" label, price, and percentage below the stop loss line
+      ctx.fillStyle = 'white';
+      ctx.font = '13px Arial';
+      ctx.textAlign = 'right';
+
+      ctx.fillText(stopLossPrice.toFixed(2), ctx.canvas.width - 10, scaleY(stopLossPrice, min, yStep, height) + 16);
+      ctx.fillText(`${percentageDifference.toFixed(2)}%`, ctx.canvas.width - 10, scaleY(stopLossPrice, min, yStep, height) + 32);
+
+      // Display the current price
+      ctx.fillText(latestPrice.toFixed(2), ctx.canvas.width - 10, scaleY(latestPrice, min, yStep, height) + 16);
+
+      // Determine the direction based on the position of the stop loss
+      direction = stopLossPrice > latestPrice ? 'short' : 'long';
+
+      // Calculate position size and take profit price based on direction
+      if (direction === 'long') {
+        positionSize = (availableCapital * (risk / (100 - (stopLossPrice / (latestPrice / 100))))) / ((1 + (((risk / (100 - stopLossPrice / (latestPrice / 100))) * orderCostOpeningPosition) / risk) + ((((risk / (100 - stopLossPrice / (latestPrice / 100))) * orderCostClosingPosition) / risk))));
+        positionSize = Math.round(positionSize * 100) / 100;
+
+        takeProfitPrice = (latestPrice / 100) * (100 + (riskReward * (100 - stopLossPrice / (latestPrice / 100))) + (riskReward * orderCostOpeningPosition) + (riskReward * orderCostClosingPosition) + orderCostOpeningPosition + orderCostClosingPosition);
+        takeProfitPrice = Math.round(takeProfitPrice * 100) / 100;
+
+      } else if (direction === 'short') {
+        positionSize = (((availableCapital * (risk / (100 - (stopLossPrice / (latestPrice / 100))))) / ((1 - (((risk / (100 - stopLossPrice / (latestPrice / 100))) * orderCostOpeningPosition) / risk) - ((((risk / (100 - stopLossPrice / (latestPrice / 100))) * orderCostClosingPosition) / risk))))) * -1);
+        positionSize = Math.round(positionSize * 100) / 100;
+
+        takeProfitPrice = ((latestPrice / 100) * (100 + (riskReward * (100 - stopLossPrice / (latestPrice / 100))) - (riskReward * orderCostOpeningPosition) - (riskReward * orderCostClosingPosition) - orderCostOpeningPosition - orderCostClosingPosition));
+        takeProfitPrice = Math.round(takeProfitPrice * 100) / 100;
+
+      }
+
+
+
+      // Draw the take profit line
+      ctx.beginPath();
+      ctx.moveTo(0, scaleY(takeProfitPrice, min, yStep, height));
+      ctx.lineTo(canvas.width, scaleY(takeProfitPrice, min, yStep, height));
+      ctx.strokeStyle = 'green';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]); // Dashed line style
+      ctx.stroke();
+      ctx.setLineDash([]); // Reset line style
+      // Display the take profit price
+      ctx.fillText(takeProfitPrice.toFixed(2), ctx.canvas.width - 10, scaleY(takeProfitPrice, min, yStep, height) + 16);
+      // Display the Position Size price
+      //ctx.fillText(positionSize.toFixed(2), ctx.canvas.width - 10, scaleY(takeProfitPrice, min, yStep, height) - 8);
+
+
+      // Calculate EMA50 and EMA200 data based on the close prices
+      const ema50Data = calculateEMA(data.map(e => e.close), 50);
+      const ema200Data = calculateEMA(data.map(e => e.close), 200);
+
+      // Draw EMA200 line
+      ctx.beginPath();
+      ctx.moveTo(0, scaleY(ema200Data[0], min, yStep, height));
+      for (let i = 1; i < ema200Data.length; i++) {
+        const x = candleXStart + (i * (candleWidth + candleSpacing));
+        const y = scaleY(ema200Data[i], min, yStep, height);
+        ctx.lineTo(x + candleWidth / 2, y);
+      }
+      ctx.strokeStyle = 'yellow';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Funktion zur Berechnung des Exponential Moving Average (EMA)
+      function calculateEMA(data, period) {
+        const k = 2 / (period + 1);
+        const emaArray = [];
+        let ema = data[0];
+
+        emaArray.push(ema);
+
+        for (let i = 1; i < data.length; i++) {
+          ema = (data[i] * k) + (ema * (1 - k));
+          emaArray.push(ema);
+        }
+
+        return emaArray;
+      }
+
+
+
+
+      technicalRR = (takeProfitPrice - latestPrice) / (latestPrice - stopLossPrice)
+      orderCostPosition = (orderCostOpeningPosition + orderCostClosingPosition) * positionSize / 100
+
+      if (direction === 'long') {
+        netProfit = (((positionSize / 100) * (takeProfitPrice / (latestPrice / 100))) - positionSize) - orderCostPosition;
+        netProfit = Math.round(netProfit * 100) / 100;
+      } else if (direction === 'short') {
+        netProfit = (positionSize - ((positionSize / 100) * (takeProfitPrice / (latestPrice / 100)))) - orderCostPosition;
+        netProfit = Math.round(netProfit * 100) / 100;
+      }
+      //netProfit = ((takeProfitPrice - latestPrice) * positionSize) - orderCostPosition
+
+      // Data Log
+      // Festlegen der X-Koordinate für die Bezeichnungen
+      // Ermitteln der maximalen Breite der Bezeichnungen
+      ctx.font = '13px Arial';
+      const maxLabelWidth = Math.max(
+
+        ctx.measureText('Available Capital: ').width,
+        ctx.measureText('Position Size: ').width,
+        ctx.measureText('Technical Risk Reward Ratio: ').width,
+        ctx.measureText('Order Cost Position: ').width,
+        ctx.measureText('Net Profit: ').width,
+        //ctx.measureText('Percentage Difference: ').width
+      );
+
+      const labelXCoordinate = maxLabelWidth; // Beispielwert für die X-Koordinate der Bezeichnungen
+
+      // Festlegen der X-Koordinate für die Werte
+      const valueXCoordinate = maxLabelWidth + 80; // Beispielwert für die X-Koordinate der Werte
+
+      // Zeichnen der Bezeichnungen und Werte
+      ctx.font = '13px Arial'; // Ändere die Schriftgröße hier (16px)
+
+      ctx.fillText('Available Capital: ', labelXCoordinate, 60);
+      ctx.fillText(availableCapital.toFixed(2), valueXCoordinate, 60);
+
+      ctx.fillText('Position Size: ', labelXCoordinate, 80);
+      ctx.fillText(positionSize.toFixed(2), valueXCoordinate, 80);
+
+      ctx.fillText('Technical Risk Reward Ratio: ', labelXCoordinate, 20);
+      ctx.fillText(technicalRR.toFixed(2), valueXCoordinate, 20);
+
+      ctx.fillText('Order Cost Position: ', labelXCoordinate, 40);
+      ctx.fillText(orderCostPosition.toFixed(2), valueXCoordinate, 40);
+
+      ctx.fillText('Net Profit: ', labelXCoordinate, 100);
+      ctx.fillText(netProfit.toFixed(2), valueXCoordinate, 100);
+
+      //ctx.fillText('Percentage Difference: ', labelXCoordinate, 120);
+      //ctx.fillText(percentageDifference.toFixed(2), valueXCoordinate, 120);
+
+
+
+
+    }
+
+    // Funktion zur Aktualisierung der gecachten Daten basierend auf dem ausgewählten Intervall
+    async function updateCache(interval) {
+      const latestData = await getData(interval);
+      cachedData = latestData;
+    }
+
+    // Funktion zur Aktualisierung des Diagramms mit den neuesten Daten
+    async function updateChart() {
+      const latestPrice = await getLatestPrice();
+      const lastCandle = cachedData[cachedData.length - 1];
+      lastCandle.close = latestPrice;
+
+      if (latestPrice > lastCandle.high) {
+        lastCandle.high = latestPrice;
+      } else if (latestPrice < lastCandle.low) {
+        lastCandle.low = latestPrice;
+      }
+
+      if (isCandleExpired(lastCandle.timestamp, intervalToMilliseconds(currentInterval))) {
+        await updateCache(currentInterval);
+      }
+
+      drawChart(cachedData);
+      requestAnimationFrame(updateChart);
+    }
+
+
+    // Funktion zur Umwandlung des Intervalls in Millisekunden
+    function intervalToMilliseconds(interval) {
+      const intervals = {
+        '1m': 60 * 1000,
+        '3m': 3 * 60 * 1000,
+        '5m': 5 * 60 * 1000,
+        '15m': 15 * 60 * 1000,
+        '30m': 30 * 60 * 1000,
+        '1h': 60 * 60 * 1000,
+        '2h': 2 * 60 * 60 * 1000,
+        '3h': 3 * 60 * 60 * 1000,
+        '4h': 4 * 60 * 60 * 1000,
+        '1d': 24 * 60 * 60 * 1000,
+      };
+
+      return intervals[interval];
+    }
+
+    // Funktion zum Ändern des ausgewählten Intervalls
+    function changeInterval(interval) {
+      if (interval !== currentInterval) {
+        currentInterval = interval;
+        updateCache(interval);
+      }
+    }
+
+    // Initialisieren des Diagramms und Starten der Aktualisierung
+    (async function initialize() {
+      cachedData = await getData(currentInterval);
+      drawChart(cachedData);
+
+      updateChart();
+    })();
+
+    // Event listener für Mausklicks hinzufügen
+    const openTradeButton = document.getElementById('openTradeButton');
+    openTradeButton.addEventListener('click', async () => {
+      console.log('Open Trade clicked');
+      await placeTrade(positionSize, stopLossPrice, takeProfitPrice, direction);
+    });
+
+    // Event listener für Tastatureingaben hinzufügen
+    document.addEventListener('keydown', async (event) => {
+      // Überprüfen, ob die gedrückte Taste die gewünschte ist (z.B. die Taste "x")
+      if (event.key === 'x') {
+        console.log('Open Trade triggered by "x" key');
+        await placeTrade(positionSize, stopLossPrice, takeProfitPrice, direction);
+      }
+    });
+
+    // Add event listeners for panning and zooming
+    const canvas = document.getElementById('chart');
+
+    canvas.addEventListener('mousedown', (e) => {
+      const canvasRect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - canvasRect.left;
+      const mouseY = e.clientY - canvasRect.top;
+
+      // Check if mouse is inside the zoom area
+      if (mouseX >= canvas.width - 70 && mouseY < canvas.height) {
+        isMouseDown = true;
+        startY = e.clientY;
+      } else {
+        isPanning = true;
+        startX = e.clientX;
+        startY = e.clientY;
+      }
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (isMouseDown) {
+        const dy = e.clientY - startY;
+        offsetY += dy;
+        startY = e.clientY;
+
+        const scaleFactor = -0.01;
+        scaleYFactor += dy * scaleFactor;
+        scaleYFactor = Math.max(scaleYFactor, 0.1);
+
+        drawChart(cachedData);
+      } else if (isPanning) {
+        const dx = startX - e.clientX; // Invert the sign
+        const dy = e.clientY - startY;
+        offsetX += dx;
+        offsetY += dy;
+        startX = e.clientX;
+        startY = e.clientY;
+        drawChart(cachedData);
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      if (isMouseDown) {
+        isMouseDown = false;
+        drawChart(cachedData);
+      } else if (isPanning) {
+        isPanning = false;
+        drawChart(cachedData);
+      }
+    });
+
+    canvas.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0];
+      const canvasRect = canvas.getBoundingClientRect();
+      const touchX = touch.clientX - canvasRect.left;
+      const touchY = touch.clientY - canvasRect.top;
+
+      // Check if touch is inside the zoom area
+      if (touchX >= canvas.width - 70 && touchY < canvas.height) {
+        isMouseDown = true;
+        startY = touch.clientY;
+      } else {
+        isPanning = true;
+        startX = touch.clientX;
+        startY = touch.clientY;
+      }
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+      if (isMouseDown) {
+        const dy = touch.clientY - startY;
+        offsetY += dy;
+        startY = touch.clientY;
+
+        const scaleFactor = -0.01;
+        scaleYFactor += dy * scaleFactor;
+        scaleYFactor = Math.max(scaleYFactor, 0.1);
+
+        drawChart(cachedData);
+      } else if (isPanning) {
+        const dx = startX - touch.clientX; // Invert the sign
+        const dy = touch.clientY - startY;
+        offsetX += dx;
+        offsetY += dy;
+        startX = touch.clientX;
+        startY = touch.clientY;
+        drawChart(cachedData);
+      }
+    });
+
+    canvas.addEventListener('touchend', () => {
+      if (isMouseDown) {
+        isMouseDown = false;
+        drawChart(cachedData);
+      } else if (isPanning) {
+        isPanning = false;
+        drawChart(cachedData);
+      }
+    });
+
+    canvas.addEventListener('wheel', (e) => {
+      const direction = e.deltaY < 0 ? 1 : -1;
+      const candleWidthChange = 1; // Adjustment step for candle width
+
+      const newCandleWidth = candleWidth + candleWidthChange * direction;
+      candleWidth = Math.max(minCandleWidth, Math.min(maxCandleWidth, newCandleWidth));
+
+      drawChart(cachedData);
+
+      e.preventDefault(); // Verhindert das Scrollen der Seite beim Scrollen innerhalb des Charts
+    });
+
+    let initialDistance = 0;
+    let initialCandleWidth = 0;
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+
+        initialDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+        initialCandleWidth = candleWidth;
+      }
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2) {
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+
+        const currentDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+        const distanceChange = currentDistance - initialDistance;
+        const candleWidthChange = distanceChange * 0.1; // Adjustment factor for candle width change
+
+        const newCandleWidth = initialCandleWidth + candleWidthChange;
+        const clampedCandleWidth = Math.max(minCandleWidth, Math.min(maxCandleWidth, newCandleWidth));
+
+        if (Math.abs(clampedCandleWidth - candleWidth) > 0.01) {
+          // Only update candleWidth if the change is significant
+          candleWidth = clampedCandleWidth;
+        }
+      }
+    });
+
+  </script>
+</body>
+
+</html>
